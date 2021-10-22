@@ -50,13 +50,18 @@ class AutoVerticalStitchGUI(QWidget):
         self.sample_moved_down_checkbox = QCheckBox("Was the sample moved down during experiment?")
         self.sample_moved_down_checkbox.stateChanged.connect(self.set_sample_moved_down_checkbox)
 
-        self.stitch_projections_rButton = QRadioButton("Stitch Projections")
 
         self.stitch_reconstructed_slices_rButton = QRadioButton("Stitch Reconstructed Slices")
+        self.stitch_reconstructed_slices_rButton.clicked.connect(self.stitch_reconstructed_slices_rButton_clicked)
+
+        self.stitch_projections_rButton = QRadioButton("Stitch Projections")
+        self.stitch_projections_rButton.clicked.connect(self.stitch_projections_rButton_clicked)
 
         self.equalize_intensity_rButton = QRadioButton("Equalize Intensity")
+        self.equalize_intensity_rButton.clicked.connect(self.equalize_intensity_rButton_clicked)
 
         self.concatenate_rButton = QRadioButton("Concatenate")
+        self.concatenate_rButton.clicked.connect(self.concatenate_rButton_clicked)
 
         self.save_params_button = QPushButton("Save parameters")
         self.save_params_button.clicked.connect(self.save_params_button_clicked)
@@ -226,6 +231,26 @@ class AutoVerticalStitchGUI(QWidget):
     def set_sample_moved_down_checkbox(self):
         logging.debug("Sample was moved down: " + str(self.sample_moved_down_checkbox.isChecked()))
         self.parameters['sample_moved_down'] = self.sample_moved_down_checkbox.isChecked()
+
+    def stitch_reconstructed_slices_rButton_clicked(self):
+        logging.debug("Stitch Reconstructed Slices: " + str(self.stitch_reconstructed_slices_rButton.isChecked()))
+        self.parameters['stitch_reconstructed_slices'] = self.stitch_reconstructed_slices_rButton.isChecked()
+        self.parameters['stitch_projections'] = self.stitch_projections_rButton.isChecked()
+
+    def stitch_projections_rButton_clicked(self):
+        logging.debug("Stitch Projections: " + str(self.stitch_projections_rButton.isChecked()))
+        self.parameters['stitch_projections'] = self.stitch_projections_rButton.isChecked()
+        self.parameters['stitch_reconstructed_slices'] = self.stitch_reconstructed_slices_rButton.isChecked()
+
+    def equalize_intensity_rButton_clicked(self):
+        logging.debug("Equalize Intensity: " + str(self.equalize_intensity_rButton.isChecked()))
+        self.parameters['equalize_intensity'] = self.equalize_intensity_rButton.isChecked()
+        self.parameters['concatenate'] = self.concatenate_rButton.isChecked()
+
+    def concatenate_rButton_clicked(self):
+        logging.debug("Concatenate: " + str(self.concatenate_rButton.isChecked()))
+        self.parameters['concatenate'] = self.concatenate_rButton.isChecked()
+        self.parameters['equalize_intensity'] = self.equalize_intensity_rButton.isChecked()
 
     def save_params_button_clicked(self):
         logging.debug("Save params button clicked")
