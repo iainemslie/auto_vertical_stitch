@@ -63,6 +63,10 @@ class AutoVerticalStitchGUI(QWidget):
         self.concatenate_rButton = QRadioButton("Concatenate")
         self.concatenate_rButton.clicked.connect(self.concatenate_rButton_clicked)
 
+        self.which_images_to_stitch_label = QLabel("Which images to be stitched: start,stop,step:")
+        self.which_images_to_stitch_entry = QLineEdit()
+        self.which_images_to_stitch_entry.textChanged.connect(self.set_which_images_to_stitch)
+
         self.save_params_button = QPushButton("Save parameters")
         self.save_params_button.clicked.connect(self.save_params_button_clicked)
 
@@ -123,13 +127,16 @@ class AutoVerticalStitchGUI(QWidget):
         stitch_type_group.setLayout(stitch_type_layout)
         layout.addWidget(stitch_type_group, 4, 2, 1, 2)
 
-        layout.addWidget(self.save_params_button, 5, 0, 1, 2)
-        layout.addWidget(self.import_params_button, 5, 3, 1, 1)
-        layout.addWidget(self.help_button, 5, 2, 1, 1)
+        layout.addWidget(self.which_images_to_stitch_label, 5, 0, 1, 2)
+        layout.addWidget(self.which_images_to_stitch_entry, 5, 2, 1, 2)
 
-        layout.addWidget(self.stitch_button, 6, 0, 1, 2)
-        layout.addWidget(self.dry_run_checkbox, 6, 2, 1, 1)
-        layout.addWidget(self.delete_temp_button, 6, 3, 1, 1)
+        layout.addWidget(self.save_params_button, 6, 0, 1, 2)
+        layout.addWidget(self.import_params_button, 6, 3, 1, 1)
+        layout.addWidget(self.help_button, 6, 2, 1, 1)
+
+        layout.addWidget(self.stitch_button, 7, 0, 1, 2)
+        layout.addWidget(self.dry_run_checkbox, 7, 2, 1, 1)
+        layout.addWidget(self.delete_temp_button, 7, 3, 1, 1)
         self.setLayout(layout)
 
     def init_values(self):
@@ -152,6 +159,8 @@ class AutoVerticalStitchGUI(QWidget):
         self.parameters['equalize_intensity'] = True
         self.concatenate_rButton.setChecked(False)
         self.parameters['concatenate'] = False
+        self.parameters['which_images_to_stitch'] = "0,2000,1"
+        self.which_images_to_stitch_entry.setText("0,2000,1")
         self.dry_run_checkbox.setChecked(False)
         self.parameters['dry_run'] = False
 
@@ -251,6 +260,9 @@ class AutoVerticalStitchGUI(QWidget):
         logging.debug("Concatenate: " + str(self.concatenate_rButton.isChecked()))
         self.parameters['concatenate'] = self.concatenate_rButton.isChecked()
         self.parameters['equalize_intensity'] = self.equalize_intensity_rButton.isChecked()
+
+    def set_which_images_to_stitch(self):
+        logging.debug("Which images to be stitched: " + str(self.which_images_to_stitch_entry.text()))
 
     def save_params_button_clicked(self):
         logging.debug("Save params button clicked")
