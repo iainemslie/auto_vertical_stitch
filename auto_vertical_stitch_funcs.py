@@ -18,7 +18,7 @@ class AutoVerticalStitchFunctions:
         print()
         print("**************************** Running Auto Vertical Stitch ****************************")
         print("======================== Parameters ========================")
-        print("Input Directory: " + self.parameters['input_dir'])
+        print("Projections Input Directory: " + self.parameters['projections_input_dir'])
         print("Output Directory: " + self.parameters['output_dir'])
         print("Using common set of flats and darks: " + str(self.parameters['common_flats_darks']))
         print("Flats Directory: " + self.parameters['flats_dir'])

@@ -20,10 +20,10 @@ class AutoVerticalStitchGUI(QWidget):
         self.parameters = {'parameters_type': 'auto_vertical_stitch'}
         self.auto_vertical_stitch_funcs = None
 
-        self.input_button = QPushButton("Select Input Path")
-        self.input_button.clicked.connect(self.input_button_pressed)
-        self.input_entry = QLineEdit()
-        self.input_entry.textChanged.connect(self.set_input_entry)
+        self.projections_input_button = QPushButton("Select Projections Input Path")
+        self.projections_input_button.clicked.connect(self.projections_input_button_pressed)
+        self.projections_input_entry = QLineEdit()
+        self.projections_input_entry.textChanged.connect(self.set_projections_input_entry)
 
         self.output_button = QPushButton("Select Output Path")
         self.output_button.clicked.connect(self.output_button_pressed)
@@ -49,7 +49,6 @@ class AutoVerticalStitchGUI(QWidget):
 
         self.sample_moved_down_checkbox = QCheckBox("Was the sample moved down during experiment?")
         self.sample_moved_down_checkbox.stateChanged.connect(self.set_sample_moved_down_checkbox)
-
 
         self.stitch_reconstructed_slices_rButton = QRadioButton("Stitch Reconstructed Slices")
         self.stitch_reconstructed_slices_rButton.clicked.connect(self.stitch_reconstructed_slices_rButton_clicked)
@@ -94,8 +93,8 @@ class AutoVerticalStitchGUI(QWidget):
 
     def set_layout(self):
         layout = QGridLayout()
-        layout.addWidget(self.input_button, 0, 0, 1, 2)
-        layout.addWidget(self.input_entry, 0, 2, 1, 4)
+        layout.addWidget(self.projections_input_button, 0, 0, 1, 2)
+        layout.addWidget(self.projections_input_entry, 0, 2, 1, 4)
         layout.addWidget(self.output_button, 1, 0, 1, 2)
         layout.addWidget(self.output_entry, 1, 2, 1, 4)
 
@@ -140,7 +139,7 @@ class AutoVerticalStitchGUI(QWidget):
         self.setLayout(layout)
 
     def init_values(self):
-        self.input_entry.setText("...enter input directory")
+        self.projections_input_entry.setText("...enter input directory")
         self.output_entry.setText("...enter output directory")
         self.flats_entry.setText("...enter flats directory")
         self.parameters['common_flats_darks'] = False
@@ -169,7 +168,7 @@ class AutoVerticalStitchGUI(QWidget):
         # Update parameters dictionary (which is passed to auto_stitch_funcs)
         self.parameters = new_parameters
         # Update displayed parameters for GUI
-        self.input_entry.setText(self.parameters['input_dir'])
+        self.projections_input_entry.setText(self.parameters['projections_input_dir'])
         self.output_entry.setText(self.parameters['output_dir'])
         self.flats_darks_group.setChecked(bool(self.parameters['common_flats_darks']))
         self.flats_entry.setText(self.parameters['flats_dir'])
@@ -182,16 +181,16 @@ class AutoVerticalStitchGUI(QWidget):
         self.concatenate_rButton.setChecked(bool(self.parameters['concatenate']))
         self.dry_run_checkbox.setChecked(bool(self.parameters['dry_run']))
 
-    def input_button_pressed(self):
-        logging.debug("Input Button Pressed")
+    def projections_input_button_pressed(self):
+        logging.debug("Projections Input Button Pressed")
         dir_explore = QFileDialog(self)
-        input_dir = dir_explore.getExistingDirectory()
-        self.input_entry.setText(input_dir)
-        self.parameters['input_dir'] = input_dir
+        projections_input_dir = dir_explore.getExistingDirectory()
+        self.projections_input_entry.setText(projections_input_dir)
+        self.parameters['projections_input_dir'] = projections_input_dir
 
-    def set_input_entry(self):
-        logging.debug("Input Entry: " + str(self.input_entry.text()))
-        self.parameters['input_dir'] = str(self.input_entry.text())
+    def set_projections_input_entry(self):
+        logging.debug("Projections Input Entry: " + str(self.projections_input_entry.text()))
+        self.parameters['projections_input_dir'] = str(self.projections_input_entry.text())
 
     def output_button_pressed(self):
         logging.debug("Output Button Pressed")
