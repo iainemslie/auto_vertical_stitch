@@ -25,6 +25,11 @@ class AutoVerticalStitchGUI(QWidget):
         self.projections_input_entry = QLineEdit()
         self.projections_input_entry.textChanged.connect(self.set_projections_input_entry)
 
+        self.recon_slices_input_button = QPushButton("Select Reconstructed Slices Input Path")
+        self.recon_slices_input_button.clicked.connect(self.recon_slices_input_button_pressed)
+        self.recon_slices_input_entry = QLineEdit()
+        self.recon_slices_input_entry.textChanged.connect(self.set_recon_slices_input_entry)
+
         self.output_button = QPushButton("Select Output Path")
         self.output_button.clicked.connect(self.output_button_pressed)
         self.output_entry = QLineEdit()
@@ -95,8 +100,12 @@ class AutoVerticalStitchGUI(QWidget):
         layout = QGridLayout()
         layout.addWidget(self.projections_input_button, 0, 0, 1, 2)
         layout.addWidget(self.projections_input_entry, 0, 2, 1, 4)
-        layout.addWidget(self.output_button, 1, 0, 1, 2)
-        layout.addWidget(self.output_entry, 1, 2, 1, 4)
+
+        layout.addWidget(self.recon_slices_input_button, 1, 0, 1, 2)
+        layout.addWidget(self.recon_slices_input_entry, 1, 2, 1, 4)
+
+        layout.addWidget(self.output_button, 2, 0, 1, 2)
+        layout.addWidget(self.output_entry, 2, 2, 1, 4)
 
         self.flats_darks_group.setCheckable(True)
         self.flats_darks_group.setChecked(False)
@@ -106,40 +115,41 @@ class AutoVerticalStitchGUI(QWidget):
         flats_darks_layout.addWidget(self.darks_button, 1, 0, 1, 2)
         flats_darks_layout.addWidget(self.darks_entry, 1, 2, 1, 2)
         self.flats_darks_group.setLayout(flats_darks_layout)
-        layout.addWidget(self.flats_darks_group, 2, 0, 1, 4)
+        layout.addWidget(self.flats_darks_group, 3, 0, 1, 4)
 
-        layout.addWidget(self.overlap_region_label, 3, 2)
-        layout.addWidget(self.overlap_region_entry, 3, 3)
-        layout.addWidget(self.sample_moved_down_checkbox, 3, 0, 1, 2)
+        layout.addWidget(self.overlap_region_label, 4, 2)
+        layout.addWidget(self.overlap_region_entry, 4, 3)
+        layout.addWidget(self.sample_moved_down_checkbox, 4, 0, 1, 2)
 
         stitch_group = QGroupBox()
         stitch_layout = QGridLayout()
         stitch_layout.addWidget(self.stitch_reconstructed_slices_rButton, 0, 0)
         stitch_layout.addWidget(self.stitch_projections_rButton, 0, 1)
         stitch_group.setLayout(stitch_layout)
-        layout.addWidget(stitch_group, 4, 0, 1, 2)
+        layout.addWidget(stitch_group, 5, 0, 1, 2)
 
         stitch_type_group = QGroupBox()
         stitch_type_layout = QGridLayout()
         stitch_type_layout.addWidget(self.equalize_intensity_rButton, 0, 0)
         stitch_type_layout.addWidget(self.concatenate_rButton, 0, 1)
         stitch_type_group.setLayout(stitch_type_layout)
-        layout.addWidget(stitch_type_group, 4, 2, 1, 2)
+        layout.addWidget(stitch_type_group, 5, 2, 1, 2)
 
-        layout.addWidget(self.which_images_to_stitch_label, 5, 0, 1, 2)
-        layout.addWidget(self.which_images_to_stitch_entry, 5, 2, 1, 2)
+        layout.addWidget(self.which_images_to_stitch_label, 6, 0, 1, 2)
+        layout.addWidget(self.which_images_to_stitch_entry, 6, 2, 1, 2)
 
-        layout.addWidget(self.save_params_button, 6, 0, 1, 2)
-        layout.addWidget(self.import_params_button, 6, 3, 1, 1)
-        layout.addWidget(self.help_button, 6, 2, 1, 1)
+        layout.addWidget(self.save_params_button, 7, 0, 1, 2)
+        layout.addWidget(self.import_params_button, 7, 3, 1, 1)
+        layout.addWidget(self.help_button, 7, 2, 1, 1)
 
-        layout.addWidget(self.stitch_button, 7, 0, 1, 2)
-        layout.addWidget(self.dry_run_checkbox, 7, 2, 1, 1)
-        layout.addWidget(self.delete_temp_button, 7, 3, 1, 1)
+        layout.addWidget(self.stitch_button, 8, 0, 1, 2)
+        layout.addWidget(self.dry_run_checkbox, 8, 2, 1, 1)
+        layout.addWidget(self.delete_temp_button, 8, 3, 1, 1)
         self.setLayout(layout)
 
     def init_values(self):
-        self.projections_input_entry.setText("...enter input directory")
+        self.projections_input_entry.setText("...enter input directory containing projections")
+        self.recon_slices_input_entry.setText("...enter directory containing reconstructed slices")
         self.output_entry.setText("...enter output directory")
         self.flats_entry.setText("...enter flats directory")
         self.parameters['common_flats_darks'] = False
@@ -169,6 +179,7 @@ class AutoVerticalStitchGUI(QWidget):
         self.parameters = new_parameters
         # Update displayed parameters for GUI
         self.projections_input_entry.setText(self.parameters['projections_input_dir'])
+        self.recon_slices_input_entry.setText(self.parameters['recon_slices_input_dir'])
         self.output_entry.setText(self.parameters['output_dir'])
         self.flats_darks_group.setChecked(bool(self.parameters['common_flats_darks']))
         self.flats_entry.setText(self.parameters['flats_dir'])
@@ -191,6 +202,17 @@ class AutoVerticalStitchGUI(QWidget):
     def set_projections_input_entry(self):
         logging.debug("Projections Input Entry: " + str(self.projections_input_entry.text()))
         self.parameters['projections_input_dir'] = str(self.projections_input_entry.text())
+
+    def recon_slices_input_button_pressed(self):
+        logging.debug("Reconstructed Slices Input Button Pressed")
+        dir_explore = QFileDialog(self)
+        recon_slices_input_dir = dir_explore.getExistingDirectory()
+        self.recon_slices_input_entry.setText(recon_slices_input_dir)
+        self.parameters['recon_slices_input_dir'] = recon_slices_input_dir
+
+    def set_recon_slices_input_entry(self):
+        logging.debug("Reconstructed Slices Input Entry: " + str(self.recon_slices_input_entry.text()))
+        self.parameters['recon_slices_input_dir'] = str(self.recon_slices_input_entry.text())
 
     def output_button_pressed(self):
         logging.debug("Output Button Pressed")
@@ -244,11 +266,17 @@ class AutoVerticalStitchGUI(QWidget):
         logging.debug("Stitch Reconstructed Slices: " + str(self.stitch_reconstructed_slices_rButton.isChecked()))
         self.parameters['stitch_reconstructed_slices'] = self.stitch_reconstructed_slices_rButton.isChecked()
         self.parameters['stitch_projections'] = self.stitch_projections_rButton.isChecked()
+        if self.stitch_reconstructed_slices_rButton.isChecked():
+            self.recon_slices_input_button.setEnabled(True)
+            self.recon_slices_input_entry.setEnabled(True)
 
     def stitch_projections_rButton_clicked(self):
         logging.debug("Stitch Projections: " + str(self.stitch_projections_rButton.isChecked()))
         self.parameters['stitch_projections'] = self.stitch_projections_rButton.isChecked()
         self.parameters['stitch_reconstructed_slices'] = self.stitch_reconstructed_slices_rButton.isChecked()
+        if self.stitch_projections_rButton.isChecked():
+            self.recon_slices_input_button.setDisabled(True)
+            self.recon_slices_input_entry.setDisabled(True)
 
     def equalize_intensity_rButton_clicked(self):
         logging.debug("Equalize Intensity: " + str(self.equalize_intensity_rButton.isChecked()))
@@ -262,6 +290,7 @@ class AutoVerticalStitchGUI(QWidget):
 
     def set_which_images_to_stitch(self):
         logging.debug("Which images to be stitched: " + str(self.which_images_to_stitch_entry.text()))
+        self.parameters['images_to_stitch'] = self.which_images_to_stitch_entry.text()
 
     def save_params_button_clicked(self):
         logging.debug("Save params button clicked")
