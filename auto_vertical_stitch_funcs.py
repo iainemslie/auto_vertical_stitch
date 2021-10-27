@@ -2,6 +2,7 @@ import os
 import glob
 import numpy as np
 import tifffile
+from skimage import exposure
 
 class AutoVerticalStitchFunctions:
     def __init__(self, parameters):
@@ -58,6 +59,7 @@ class AutoVerticalStitchFunctions:
         Looks at each ct-directory, finds the midpoint z-directory and it's successor
         We then use images from the "tomo" directory to determine the point of overlap
         """
+        index = 0
         for ct_dir in self.ct_dirs:
             z_glob_path = os.path.join(ct_dir, 'z??')
             z_list = sorted(glob.glob(z_glob_path))
@@ -75,17 +77,17 @@ class AutoVerticalStitchFunctions:
             midpoint_image_list = sorted(glob.glob(os.path.join(midpoint_zdir_tomo, '*.tif')))
             one_after_midpoint_image_list = sorted(glob.glob(os.path.join(one_after_midpoint_zdir_tomo, '*.tif')))
 
-            midpoint_first_image_path = midpoint_image_list[0]
-            one_after_midpoint_first_image_path = one_after_midpoint_image_list[0]
+            midpoint_first_image_path = midpoint_image_list[int(len(midpoint_image_list)/2)]
+            one_after_midpoint_first_image_path = one_after_midpoint_image_list[int(len(one_after_midpoint_image_list)/2)]
 
-            self.compute_stitch_pixel(midpoint_first_image_path, one_after_midpoint_first_image_path)
+            self.compute_stitch_pixel(midpoint_first_image_path, one_after_midpoint_first_image_path, index)
+            index += 1
 
-    def compute_stitch_pixel(self, upper_image, lower_image):
+    def compute_stitch_pixel(self, upper_image, lower_image, index):
         """
         Takes two pairs of images with vertical overlap, determines the point at which to stitch the images
         :return:
         """
-
         # Read in the images to numpy array
         first = self.read_image(upper_image, False)
         second = self.read_image(lower_image, False)
@@ -105,12 +107,25 @@ class AutoVerticalStitchFunctions:
         first = (first - dark) / flat
         second = (second - dark) / flat
 
-        # We must flip the second image to that it has the same orientation as the first
-        second = np.flipud(second)
+        tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'first.tif'), first)
+        tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'second.tif'), second)
 
-        # We must crop the both images from bottom of image until overlap region
-        first_cropped = first[:-int(self.parameters['overlap_region']), :]
-        second_cropped = second[:-int(self.parameters['overlap_region']), :]
+        # Flip and rotate the images so that they have same orientation as auto_horizontal_stitch
+        first = np.rot90(first)
+        second = np.rot90(second)
+        first = np.fliplr(first)
+
+        # Equalize the histograms and match them so that images are more similar
+        first = exposure.equalize_hist(first)
+        second = exposure.equalize_hist(second)
+        second = exposure.match_histograms(second, first)
+
+        tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'first_fliprot.tif'), first)
+        tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'second_fliprot.tif'), second)
+
+        # We must crop the both images from left column of image until overlap region
+        first_cropped = first[:, :int(self.parameters['overlap_region'])]
+        second_cropped = second[:, :int(self.parameters['overlap_region'])]
 
         stitch_pixel = self.compute_rotation_axis(first_cropped, second_cropped)
 
