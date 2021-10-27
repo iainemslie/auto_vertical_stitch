@@ -10,6 +10,7 @@ class AutoVerticalStitchFunctions:
         self.parameters = parameters
         self.z_dirs = []
         self.ct_dirs = []
+        self.ct_stitch_pixel_dict = {}
 
     def run_vertical_auto_stitch(self):
         """
@@ -30,6 +31,10 @@ class AutoVerticalStitchFunctions:
 
         print("--> Finding Stitch Index")
         self.find_stitch_pixel()
+        print(self.ct_stitch_pixel_dict)
+
+        print("--> Stitching Images")
+        self.stitch_images()
 
     def find_z_dirs(self):
         """
@@ -67,6 +72,7 @@ class AutoVerticalStitchFunctions:
             # Get list of z-directories within each ct directory
             midpoint_zdir = z_list[int(len(z_list) / 2)]
             one_after_midpoint_zdir = z_list[int(len(z_list) / 2) + 1]
+            print("Working on: " + ct_dir)
             print(midpoint_zdir)
             print(one_after_midpoint_zdir)
 
@@ -77,13 +83,22 @@ class AutoVerticalStitchFunctions:
             midpoint_image_list = sorted(glob.glob(os.path.join(midpoint_zdir_tomo, '*.tif')))
             one_after_midpoint_image_list = sorted(glob.glob(os.path.join(one_after_midpoint_zdir_tomo, '*.tif')))
 
-            midpoint_first_image_path = midpoint_image_list[int(len(midpoint_image_list)/2)]
-            one_after_midpoint_first_image_path = one_after_midpoint_image_list[int(len(one_after_midpoint_image_list)/2)]
+            stitch_pixel_list = []
+            # Compute the stitch pixel for every 100th image
+            for image_index in range(0, len(midpoint_image_list)+50, 50):
+                if image_index > 0:
+                    image_index = image_index - 1
+                midpoint_first_image_path = midpoint_image_list[image_index]
+                one_after_midpoint_first_image_path = one_after_midpoint_image_list[image_index]
+                stitch_pixel_list.append(self.compute_stitch_pixel(midpoint_first_image_path,
+                                                                   one_after_midpoint_first_image_path))
 
-            self.compute_stitch_pixel(midpoint_first_image_path, one_after_midpoint_first_image_path, index)
-            index += 1
+            print(stitch_pixel_list)
+            most_common_value = max(set(stitch_pixel_list), key=stitch_pixel_list.count)
+            self.ct_stitch_pixel_dict[ct_dir] = int(most_common_value)
+            print("Stitch Pixel: " + str(int(most_common_value)))
 
-    def compute_stitch_pixel(self, upper_image, lower_image, index):
+    def compute_stitch_pixel(self, upper_image, lower_image):
         """
         Takes two pairs of images with vertical overlap, determines the point at which to stitch the images
         :return:
@@ -107,8 +122,8 @@ class AutoVerticalStitchFunctions:
         first = (first - dark) / flat
         second = (second - dark) / flat
 
-        tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'first.tif'), first)
-        tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'second.tif'), second)
+        #tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'first.tif'), first)
+        #tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'second.tif'), second)
 
         # Flip and rotate the images so that they have same orientation as auto_horizontal_stitch
         first = np.rot90(first)
@@ -120,16 +135,43 @@ class AutoVerticalStitchFunctions:
         second = exposure.equalize_hist(second)
         second = exposure.match_histograms(second, first)
 
-        tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'first_fliprot.tif'), first)
-        tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'second_fliprot.tif'), second)
+        # Threshold the images
+        first = first > np.mean(first)
+        second = second > np.mean(second)
+
+        #tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'first_fliprot.tif'), first)
+        #tifffile.imwrite(os.path.join(self.parameters['output_dir'], str(index)+'second_fliprot.tif'), second)
 
         # We must crop the both images from left column of image until overlap region
         first_cropped = first[:, :int(self.parameters['overlap_region'])]
         second_cropped = second[:, :int(self.parameters['overlap_region'])]
 
-        stitch_pixel = self.compute_rotation_axis(first_cropped, second_cropped)
+        return self.compute_rotation_axis(first_cropped, second_cropped)
 
-        print(stitch_pixel)
+    def stitch_images(self):
+        for ct_dir in self.ct_dirs:
+            print("--> stitching: " + ct_dir)
+            z_glob_path = os.path.join(ct_dir, 'z??')
+            z_list = sorted(glob.glob(z_glob_path))
+            for z_index in range(0, len(z_list) - 1):
+                print(z_list[z_index])
+                print(z_list[z_index+1])
+
+            first_images = sorted(os.listdir(os.path.join(z_list[0], "tomo")))
+            second_images = sorted(os.listdir(os.path.join(z_list[1], "tomo")))
+
+            print(first_images)
+            print(second_images)
+
+            z00_im1 = self.read_image(os.path.join(z_list[0], "tomo", first_images[0]), flip_image=False)
+            z01_im1 = self.read_image(os.path.join(z_list[1], "tomo", second_images[0]), flip_image=False)
+
+            axis = self.ct_stitch_pixel_dict[ct_dir]
+            out_path = self.parameters['output_dir']
+            type_str = "tomo"
+            out_fmt = os.path.join(out_path, "", type_str + "_stitched_{:>04}.tif".format(0))
+            stitched = self.stitch(z00_im1, z01_im1, axis, 0)
+            tifffile.imwrite(out_fmt, stitched)
 
 
     def print_parameters(self):
@@ -187,6 +229,31 @@ class AutoVerticalStitchFunctions:
         return (width / 2.0 + center) / 2
 
     """****** BORROWED FUNCTIONS ******"""
+    def stitch(self, upper, lower, axis, crop):
+        height, width = lower.shape
+        if axis > height / 2:
+            dy = int(2 * (height - axis) + 0.5)
+        else:
+            dy = int(2 * axis + 0.5)
+            tmp = np.copy(lower)
+            lower = upper
+            upper = tmp
+        result = np.empty((2 * height - dy, width), dtype=lower.dtype)
+        ramp = np.linspace(0, 1, dy)
+
+        # Mean values of the overlapping regions must match, which corrects flat-field inconsistency
+        # between the two projections
+        # We clip the values in upper so that there are no saturated pixel overflow problems
+        k = np.mean(lower[height - dy:, :]) / np.mean(upper[:dy, :])
+        upper = np.clip(upper * k, np.iinfo(np.uint16).min, np.iinfo(np.uint16).max).astype(np.uint16)
+
+        result[:height - dy, :] = lower[:height - dy, :]
+        result[height - dy:height, :] = lower[height - dy:, :] + upper[:dy, :]
+        # TODO: Figure out how to add ramp back
+        #result[height - dy:height, :] = lower[height - dy:, :] * (1 - ramp) + upper[:dy, :] * ramp
+        result[height:, :] = upper[dy:, :]
+
+        return result[slice(int(crop), int(2 * (height - axis) - crop), 1), :]
 
     def read_image(self, file_name, flip_image):
         """

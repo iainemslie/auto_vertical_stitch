@@ -195,7 +195,7 @@ class AutoVerticalStitchGUI(QWidget):
     def projections_input_button_pressed(self):
         logging.debug("Projections Input Button Pressed")
         dir_explore = QFileDialog(self)
-        projections_input_dir = dir_explore.getExistingDirectory()
+        projections_input_dir = dir_explore.getExistingDirectory(directory="/")
         self.projections_input_entry.setText(projections_input_dir)
         self.parameters['projections_input_dir'] = projections_input_dir
 
@@ -206,7 +206,7 @@ class AutoVerticalStitchGUI(QWidget):
     def recon_slices_input_button_pressed(self):
         logging.debug("Reconstructed Slices Input Button Pressed")
         dir_explore = QFileDialog(self)
-        recon_slices_input_dir = dir_explore.getExistingDirectory()
+        recon_slices_input_dir = dir_explore.getExistingDirectory(directory="/")
         self.recon_slices_input_entry.setText(recon_slices_input_dir)
         self.parameters['recon_slices_input_dir'] = recon_slices_input_dir
 
@@ -217,7 +217,7 @@ class AutoVerticalStitchGUI(QWidget):
     def output_button_pressed(self):
         logging.debug("Output Button Pressed")
         dir_explore = QFileDialog(self)
-        output_dir = dir_explore.getExistingDirectory()
+        output_dir = dir_explore.getExistingDirectory(directory="/")
         self.output_entry.setText(output_dir)
         self.parameters['output_dir'] = output_dir
 
