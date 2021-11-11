@@ -35,6 +35,11 @@ class AutoVerticalStitchGUI(QWidget):
         self.output_entry = QLineEdit()
         self.output_entry.textChanged.connect(self.set_output_entry)
 
+        self.temp_button = QPushButton("Select Temporary Directory")
+        self.temp_button.clicked.connect(self.temp_button_pressed)
+        self.temp_entry = QLineEdit()
+        self.temp_entry.textChanged.connect(self.set_temp_entry)
+
         self.flats_darks_group = QGroupBox("Use Common Set of Flats and Darks")
         self.flats_darks_group.clicked.connect(self.set_flats_darks_group)
 
@@ -107,6 +112,9 @@ class AutoVerticalStitchGUI(QWidget):
         layout.addWidget(self.output_button, 2, 0, 1, 2)
         layout.addWidget(self.output_entry, 2, 2, 1, 4)
 
+        layout.addWidget(self.temp_button, 3, 0, 1, 2)
+        layout.addWidget(self.temp_entry, 3, 2, 1, 4)
+
         self.flats_darks_group.setCheckable(True)
         self.flats_darks_group.setChecked(False)
         flats_darks_layout = QGridLayout()
@@ -115,42 +123,43 @@ class AutoVerticalStitchGUI(QWidget):
         flats_darks_layout.addWidget(self.darks_button, 1, 0, 1, 2)
         flats_darks_layout.addWidget(self.darks_entry, 1, 2, 1, 2)
         self.flats_darks_group.setLayout(flats_darks_layout)
-        layout.addWidget(self.flats_darks_group, 3, 0, 1, 4)
+        layout.addWidget(self.flats_darks_group, 4, 0, 1, 4)
 
-        layout.addWidget(self.overlap_region_label, 4, 2)
-        layout.addWidget(self.overlap_region_entry, 4, 3)
-        layout.addWidget(self.sample_moved_down_checkbox, 4, 0, 1, 2)
+        layout.addWidget(self.overlap_region_label, 5, 2)
+        layout.addWidget(self.overlap_region_entry, 5, 3)
+        layout.addWidget(self.sample_moved_down_checkbox, 5, 0, 1, 2)
 
         stitch_group = QGroupBox()
         stitch_layout = QGridLayout()
         stitch_layout.addWidget(self.stitch_reconstructed_slices_rButton, 0, 0)
         stitch_layout.addWidget(self.stitch_projections_rButton, 0, 1)
         stitch_group.setLayout(stitch_layout)
-        layout.addWidget(stitch_group, 5, 0, 1, 2)
+        layout.addWidget(stitch_group, 6, 0, 1, 2)
 
         stitch_type_group = QGroupBox()
         stitch_type_layout = QGridLayout()
         stitch_type_layout.addWidget(self.equalize_intensity_rButton, 0, 0)
         stitch_type_layout.addWidget(self.concatenate_rButton, 0, 1)
         stitch_type_group.setLayout(stitch_type_layout)
-        layout.addWidget(stitch_type_group, 5, 2, 1, 2)
+        layout.addWidget(stitch_type_group, 6, 2, 1, 2)
 
-        layout.addWidget(self.which_images_to_stitch_label, 6, 0, 1, 2)
-        layout.addWidget(self.which_images_to_stitch_entry, 6, 2, 1, 2)
+        layout.addWidget(self.which_images_to_stitch_label, 7, 0, 1, 2)
+        layout.addWidget(self.which_images_to_stitch_entry, 7, 2, 1, 2)
 
-        layout.addWidget(self.save_params_button, 7, 0, 1, 2)
-        layout.addWidget(self.import_params_button, 7, 3, 1, 1)
-        layout.addWidget(self.help_button, 7, 2, 1, 1)
+        layout.addWidget(self.save_params_button, 8, 0, 1, 2)
+        layout.addWidget(self.import_params_button, 8, 3, 1, 1)
+        layout.addWidget(self.help_button, 8, 2, 1, 1)
 
-        layout.addWidget(self.stitch_button, 8, 0, 1, 2)
-        layout.addWidget(self.dry_run_checkbox, 8, 2, 1, 1)
-        layout.addWidget(self.delete_temp_button, 8, 3, 1, 1)
+        layout.addWidget(self.stitch_button, 9, 0, 1, 2)
+        layout.addWidget(self.dry_run_checkbox, 9, 2, 1, 1)
+        layout.addWidget(self.delete_temp_button, 9, 3, 1, 1)
         self.setLayout(layout)
 
     def init_values(self):
         self.projections_input_entry.setText("...enter input directory containing projections")
         self.recon_slices_input_entry.setText("...enter directory containing reconstructed slices")
         self.output_entry.setText("...enter output directory")
+        self.temp_entry.setText("...enter temporary directory")
         self.flats_entry.setText("...enter flats directory")
         self.parameters['common_flats_darks'] = False
         self.parameters['flats_dir'] = ""
@@ -181,6 +190,7 @@ class AutoVerticalStitchGUI(QWidget):
         self.projections_input_entry.setText(self.parameters['projections_input_dir'])
         self.recon_slices_input_entry.setText(self.parameters['recon_slices_input_dir'])
         self.output_entry.setText(self.parameters['output_dir'])
+        self.temp_entry.setText(self.parameters['temp_dir'])
         self.flats_darks_group.setChecked(bool(self.parameters['common_flats_darks']))
         self.flats_entry.setText(self.parameters['flats_dir'])
         self.darks_entry.setText(self.parameters['darks_dir'])
@@ -224,6 +234,17 @@ class AutoVerticalStitchGUI(QWidget):
     def set_output_entry(self):
         logging.debug("Output Entry: " + str(self.output_entry.text()))
         self.parameters['output_dir'] = str(self.output_entry.text())
+
+    def temp_button_pressed(self):
+        logging.debug("Temp Button Pressed")
+        dir_explore = QFileDialog(self)
+        temp_dir = dir_explore.getExistingDirectory(directory="/")
+        self.temp_entry.setText(temp_dir)
+        self.parameters['temp_dir'] = temp_dir
+
+    def set_temp_entry(self):
+        logging.debug("Temp Entry: " + str(self.temp_entry.text()))
+        self.parameters['temp_dir'] = str(self.temp_entry.text())
 
     def set_flats_darks_group(self):
         logging.debug("Use Common Flats/Darks: " + str(self.flats_darks_group.isChecked()))
@@ -341,7 +362,11 @@ class AutoVerticalStitchGUI(QWidget):
 
     def stitch_button_pressed(self):
         logging.debug("Stitch Button Pressed")
+        if self.parameters['temp_dir'] == "...enter temporary directory":
+            print("Please enter a valid temporary directory")
+            return
         try:
+            # TODO: fix this so that dumping to yaml is in funcs
             # Create the output directory root and save the parameters.yaml file
             os.makedirs(self.parameters['output_dir'], mode=0o777)
             file_path = os.path.join(self.parameters['output_dir'], 'auto_vertical_stitch_parameters.yaml')
