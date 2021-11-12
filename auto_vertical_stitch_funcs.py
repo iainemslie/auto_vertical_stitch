@@ -3,7 +3,7 @@ import glob
 import numpy as np
 import tifffile
 import shutil
-from skimage import exposure, morphology, feature
+from skimage import exposure, morphology, feature, filters
 from skimage.filters.rank import median
 from skimage.morphology import disk
 
@@ -139,7 +139,7 @@ class AutoVerticalStitchFunctions:
         elif self.parameters['common_flats_darks']:
             flat_files = self.get_filtered_filenames(self.parameters['flats_dir'])
             dark_files = self.get_filtered_filenames(self.parameters['darks_dir'])
-
+        
         flats = np.array([tifffile.TiffFile(x).asarray().astype(np.float) for x in flat_files])
         darks = np.array([tifffile.TiffFile(x).asarray().astype(np.float) for x in dark_files])
         dark = np.mean(darks, axis=0)
@@ -151,13 +151,25 @@ class AutoVerticalStitchFunctions:
         tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second.tif'), second)
 
         # Equalize the histograms and match them so that images are more similar
-        #first = exposure.equalize_hist(first)
-        #second = exposure.equalize_hist(second)
-        #second = exposure.match_histograms(second, first)
+        first = exposure.equalize_hist(first)
+        second = exposure.equalize_hist(second)
+        second = exposure.match_histograms(second, first)
 
+        # TODO: Figure out a better edge detection
         # Do edge detection on images before convolution
+        first = filters.sobel(first)
+        second = filters.sobel(second)
+
+        # Equalize the histograms and match them so that images are more similar
+        first = exposure.equalize_hist(first)
+        second = exposure.equalize_hist(second)
+        second = exposure.match_histograms(second, first)
+
         first = feature.canny(first)
         second = feature.canny(second)
+
+        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first_edges.tif'), first)
+        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second_edges.tif'), second)
 
         # Flip and rotate the images so that they have same orientation as auto_horizontal_stitch
         first = np.rot90(first)
@@ -179,23 +191,25 @@ class AutoVerticalStitchFunctions:
     def stitch_images(self):
         for ct_dir in self.ct_dirs:
             print("--> stitching: " + ct_dir)
-            z_list = sorted(os.listdir(ct_dir))
+            z_glob_path = os.path.join(ct_dir, 'z??')
+            z_list = sorted(glob.glob(z_glob_path))
             for z_index in range(0, len(z_list) - 1):
                 print(z_list[z_index], end=' ')
                 print(z_list[z_index+1])
 
-            first_images = sorted(os.listdir(os.path.join(ct_dir, z_list[0], "tomo")))
-            second_images = sorted(os.listdir(os.path.join(ct_dir, z_list[1], "tomo")))
+            # TODO: Fix if there is something that is not a zdirectory in the ctdir
+            first_images = sorted(os.listdir(os.path.join(z_list[0], "tomo")))
+            second_images = sorted(os.listdir(os.path.join(z_list[1], "tomo")))
 
             print(first_images)
             print(second_images)
 
             if not self.parameters['sample_moved_down']:
-                z00_im1 = self.read_image(os.path.join(ct_dir, z_list[0], "tomo", first_images[0]), flip_image=False)
-                z01_im1 = self.read_image(os.path.join(ct_dir, z_list[1], "tomo", second_images[0]), flip_image=False)
+                z00_im1 = self.read_image(os.path.join(z_list[0], "tomo", first_images[0]), flip_image=False)
+                z01_im1 = self.read_image(os.path.join(z_list[1], "tomo", second_images[0]), flip_image=False)
             elif self.parameters['sample_moved_down']:
-                z00_im1 = self.read_image(os.path.join(ct_dir, z_list[0], "tomo", first_images[0]), flip_image=True)
-                z01_im1 = self.read_image(os.path.join(ct_dir, z_list[1], "tomo", second_images[0]), flip_image=True)
+                z00_im1 = self.read_image(os.path.join(z_list[0], "tomo", first_images[0]), flip_image=True)
+                z01_im1 = self.read_image(os.path.join(z_list[1], "tomo", second_images[0]), flip_image=True)
 
             axis = self.ct_stitch_pixel_dict[ct_dir]
             out_path = self.parameters['output_dir']
