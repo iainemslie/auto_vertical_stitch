@@ -3,6 +3,8 @@ import glob
 import numpy as np
 import tifffile
 import shutil
+import multiprocessing as mp
+from functools import partial
 from skimage import exposure, morphology, feature, filters
 from skimage.filters.rank import median
 from skimage.morphology import disk
@@ -92,22 +94,24 @@ class AutoVerticalStitchFunctions:
             one_after_midpoint_image_list = sorted(glob.glob(os.path.join(one_after_midpoint_zdir_tomo, '*.tif')))
 
             stitch_pixel_list = []
-            # Compute the stitch pixel for every 50th image
-            # for image_index in range(0, 50, 50):
-            # TODO: Make this parallel
+            # We divide total number of images by 10 to get step value. For 1500 images we compare every 150th image
             step_value = int(len(midpoint_image_list) / 10)
-            for image_index in range(0, len(midpoint_image_list)+step_value, step_value):
-                if image_index > 0:
-                    image_index = image_index - 1
-                midpoint_first_image_path = midpoint_image_list[image_index]
-                one_after_midpoint_first_image_path = one_after_midpoint_image_list[image_index]
-                stitch_pixel_list.append(self.compute_stitch_pixel(midpoint_first_image_path,
-                                                                   one_after_midpoint_first_image_path))
+            image_index = range(0, len(midpoint_image_list)+step_value, step_value)
+            pool = mp.Pool(processes=mp.cpu_count())
+            exec_func = partial(self.find_stitch_pixel_multiproc, midpoint_image_list, one_after_midpoint_image_list)
+            stitch_pixel_list = pool.map(exec_func, image_index)
 
             #print(stitch_pixel_list)
             most_common_value = max(set(stitch_pixel_list), key=stitch_pixel_list.count)
             self.ct_stitch_pixel_dict[ct_dir] = int(most_common_value)
             #print("Stitch Pixel: " + str(int(most_common_value)))
+
+    def find_stitch_pixel_multiproc(self, midpoint_image_list, one_after_midpoint_image_list, image_index):
+        if image_index > 0:
+            image_index = image_index - 1
+        midpoint_first_image_path = midpoint_image_list[image_index]
+        one_after_midpoint_first_image_path = one_after_midpoint_image_list[image_index]
+        return self.compute_stitch_pixel(midpoint_first_image_path, one_after_midpoint_first_image_path)
 
     def compute_stitch_pixel(self, upper_image: str, lower_image: str):
         """
@@ -128,6 +132,9 @@ class AutoVerticalStitchFunctions:
             first = self.read_image(upper_image, True)
             second = self.read_image(lower_image, True)
 
+        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first.tif'), first)
+        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second.tif'), second)
+
         # Do flat field correction using flats/darks directory in same ctdir as input images
         if not self.parameters['common_flats_darks']:
             tomo_path, filename = os.path.split(upper_image)
@@ -147,16 +154,15 @@ class AutoVerticalStitchFunctions:
         first = (first - dark) / flat
         second = (second - dark) / flat
 
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first.tif'), first)
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second.tif'), second)
+        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first_flat_corrected.tif'), first)
+        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second_flat_corrected.tif'), second)
 
         # Equalize the histograms and match them so that images are more similar
         first = exposure.equalize_hist(first)
         second = exposure.equalize_hist(second)
         second = exposure.match_histograms(second, first)
 
-        # TODO: Figure out a better edge detection
-        # Do edge detection on images before convolution
+        # Apply sobel filtering to find gradients of images
         first = filters.sobel(first)
         second = filters.sobel(second)
 
@@ -165,6 +171,7 @@ class AutoVerticalStitchFunctions:
         second = exposure.equalize_hist(second)
         second = exposure.match_histograms(second, first)
 
+        # Apply canny edge detection on sobel filtered and equalized images
         first = feature.canny(first)
         second = feature.canny(second)
 
