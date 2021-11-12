@@ -3,6 +3,7 @@ import glob
 import numpy as np
 import tifffile
 import shutil
+import math
 import multiprocessing as mp
 from functools import partial
 from skimage import exposure, morphology, feature, filters
@@ -42,7 +43,8 @@ class AutoVerticalStitchFunctions:
         print(self.ct_stitch_pixel_dict)
 
         print("\n--> Stitching Images")
-        self.stitch_images()
+        # For Testing
+        #self.stitch_single_image()
 
     def find_z_dirs(self):
         """
@@ -111,7 +113,7 @@ class AutoVerticalStitchFunctions:
             image_index = image_index - 1
         midpoint_first_image_path = midpoint_image_list[image_index]
         one_after_midpoint_first_image_path = one_after_midpoint_image_list[image_index]
-        return self.compute_stitch_pixel(midpoint_first_image_path, one_after_midpoint_first_image_path)
+        return self.col_round(self.compute_stitch_pixel(midpoint_first_image_path, one_after_midpoint_first_image_path))
 
     def compute_stitch_pixel(self, upper_image: str, lower_image: str):
         """
@@ -132,8 +134,8 @@ class AutoVerticalStitchFunctions:
             first = self.read_image(upper_image, True)
             second = self.read_image(lower_image, True)
 
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first.tif'), first)
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second.tif'), second)
+        #tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first.tif'), first)
+        #tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second.tif'), second)
 
         # Do flat field correction using flats/darks directory in same ctdir as input images
         if not self.parameters['common_flats_darks']:
@@ -154,8 +156,8 @@ class AutoVerticalStitchFunctions:
         first = (first - dark) / flat
         second = (second - dark) / flat
 
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first_flat_corrected.tif'), first)
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second_flat_corrected.tif'), second)
+        #tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first_flat_corrected.tif'), first)
+        #tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second_flat_corrected.tif'), second)
 
         # Equalize the histograms and match them so that images are more similar
         first = exposure.equalize_hist(first)
@@ -175,27 +177,49 @@ class AutoVerticalStitchFunctions:
         first = feature.canny(first)
         second = feature.canny(second)
 
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first_edges.tif'), first)
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second_edges.tif'), second)
+        #tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first_edges.tif'), first)
+        #tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second_edges.tif'), second)
 
         # Flip and rotate the images so that they have same orientation as auto_horizontal_stitch
         first = np.rot90(first)
         second = np.rot90(second)
         first = np.fliplr(first)
 
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first_fliprot_edges.tif'), first)
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second_fliprot_edges.tif'), second)
+        #tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first_fliprot_edges.tif'), first)
+        #tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second_fliprot_edges.tif'), second)
 
         # We must crop the both images from left column of image until overlap region
         first_cropped = first[:, :int(self.parameters['overlap_region'])]
         second_cropped = second[:, :int(self.parameters['overlap_region'])]
 
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first_cropped.tif'), first_cropped)
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second_cropped.tif'), second_cropped)
+        #tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'first_cropped.tif'), first_cropped)
+        #tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'second_cropped.tif'), second_cropped)
 
         return self.compute_rotation_axis(first_cropped, second_cropped)
 
-    def stitch_images(self):
+    def main_concatenate_multiproc(self):
+        if args.ort:
+            print("Creating orthogonal sections")
+        # start = time.time()
+        indir, hmin, hmax, start, stop, step, indtype = prepare(args)
+        # if args.ort:
+        #    print "Orthogonal sections created in {:.01f} sec".format(time.time()-start)
+        subdirs = [dI for dI in os.listdir(args.input) \
+                   if os.path.isdir(os.path.join(args.input, dI))]
+        zfold = sorted(subdirs)
+        l = len(zfold)
+        tmp = glob.glob(os.path.join(indir, zfold[0], args.typ, '*.tif'))
+        J = range(int((stop - start) / step))
+        pool = mp.Pool(processes=mp.cpu_count())
+        exec_func = partial(exec_conc_mp, start, step, tmp[0], l, args, zfold, indir)
+        print("Concatenating")
+        # start = time.time()
+        pool.map(exec_func, J)
+        # print "Images stitched in {:.01f} sec".format(time.time()-start)
+        print("========== Done ==========")
+
+    def stitch_single_image(self):
+        """Used for testing purposes"""
         for ct_dir in self.ct_dirs:
             print("--> stitching: " + ct_dir)
             z_glob_path = os.path.join(ct_dir, 'z??')
@@ -204,7 +228,6 @@ class AutoVerticalStitchFunctions:
                 print(z_list[z_index], end=' ')
                 print(z_list[z_index+1])
 
-            # TODO: Fix if there is something that is not a zdirectory in the ctdir
             first_images = sorted(os.listdir(os.path.join(z_list[0], "tomo")))
             second_images = sorted(os.listdir(os.path.join(z_list[1], "tomo")))
 
@@ -248,6 +271,7 @@ class AutoVerticalStitchFunctions:
         print("Overlap Region Size: " + self.parameters['overlap_region'])
         print("Stitch Reconstructed Slices: " + str(self.parameters['stitch_reconstructed_slices']))
         print("Stitch Projections: " + str(self.parameters['stitch_projections']))
+        print("Reslice: " + str(self.parameters['reslice']))
         print("Equalize Intensity: " + str(self.parameters['equalize_intensity']))
         print("Concatenate: " + str(self.parameters['concatenate']))
         print("Which images to stitch - start,stop,step: " + str(self.parameters['images_to_stitch']))
@@ -282,7 +306,7 @@ class AutoVerticalStitchFunctions:
         # vertically, so the image is transposed and we can apply convolution
         # which will act as cross-correlation
         convolved = fftconvolve(first_projection, last_projection[::-1, :], mode='same')
-        tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'convolved.tif'), convolved)
+        #tifffile.imwrite(os.path.join(self.parameters['temp_dir'], 'convolved.tif'), convolved)
         center = np.unravel_index(convolved.argmax(), convolved.shape)[1]
 
         return (width / 2.0 + center) / 2
@@ -325,3 +349,8 @@ class AutoVerticalStitchFunctions:
         if flip_image is True:
             image = np.flipud(image)
         return image
+
+    def col_round(self, x):
+        frac = x - math.floor(x)
+        if frac < 0.5: return math.floor(x)
+        return math.ceil(x)

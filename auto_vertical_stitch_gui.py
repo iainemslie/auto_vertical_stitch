@@ -72,6 +72,9 @@ class AutoVerticalStitchGUI(QWidget):
         self.concatenate_rButton = QRadioButton("Concatenate")
         self.concatenate_rButton.clicked.connect(self.concatenate_rButton_clicked)
 
+        self.reslice_checkbox = QCheckBox("Reslice")
+        self.reslice_checkbox.stateChanged.connect(self.set_reslice_checkbox)
+
         self.which_images_to_stitch_label = QLabel("Which images to be stitched: start,stop,step:")
         self.which_images_to_stitch_entry = QLineEdit()
         self.which_images_to_stitch_entry.textChanged.connect(self.set_which_images_to_stitch)
@@ -133,6 +136,7 @@ class AutoVerticalStitchGUI(QWidget):
         stitch_layout = QGridLayout()
         stitch_layout.addWidget(self.stitch_reconstructed_slices_rButton, 0, 0)
         stitch_layout.addWidget(self.stitch_projections_rButton, 0, 1)
+        stitch_layout.addWidget(self.reslice_checkbox, 1, 0)
         stitch_group.setLayout(stitch_layout)
         layout.addWidget(stitch_group, 6, 0, 1, 2)
 
@@ -173,6 +177,8 @@ class AutoVerticalStitchGUI(QWidget):
         self.parameters['stitch_reconstructed_slices'] = True
         self.stitch_projections_rButton.setChecked(False)
         self.parameters['stitch_projections'] = False
+        self.reslice_checkbox.setChecked(True)
+        self.parameters['reslice'] = True
         self.equalize_intensity_rButton.setChecked(True)
         self.parameters['equalize_intensity'] = True
         self.concatenate_rButton.setChecked(False)
@@ -198,6 +204,7 @@ class AutoVerticalStitchGUI(QWidget):
         self.overlap_region_entry.setText(self.parameters['overlap_region'])
         self.stitch_reconstructed_slices_rButton.setChecked(bool(self.parameters['stitch_reconstructed_slices']))
         self.stitch_projections_rButton.setChecked(bool(self.parameters['stitch_projections']))
+        self.reslice_checkbox.setChecked(bool(self.parameters['reslice']))
         self.equalize_intensity_rButton.setChecked(bool(self.parameters['equalize_intensity']))
         self.concatenate_rButton.setChecked(bool(self.parameters['concatenate']))
         self.dry_run_checkbox.setChecked(bool(self.parameters['dry_run']))
@@ -308,6 +315,10 @@ class AutoVerticalStitchGUI(QWidget):
         logging.debug("Concatenate: " + str(self.concatenate_rButton.isChecked()))
         self.parameters['concatenate'] = self.concatenate_rButton.isChecked()
         self.parameters['equalize_intensity'] = self.equalize_intensity_rButton.isChecked()
+
+    def set_reslice_checkbox(self):
+        logging.debug("Reslice: " + str(self.reslice_checkbox.isChecked()))
+        self.parameters['reslice'] = self.reslice_checkbox.isChecked()
 
     def set_which_images_to_stitch(self):
         logging.debug("Which images to be stitched: " + str(self.which_images_to_stitch_entry.text()))
