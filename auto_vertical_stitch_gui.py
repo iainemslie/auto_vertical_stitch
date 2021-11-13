@@ -183,7 +183,7 @@ class AutoVerticalStitchGUI(QWidget):
         self.parameters['equalize_intensity'] = True
         self.concatenate_rButton.setChecked(False)
         self.parameters['concatenate'] = False
-        self.parameters['which_images_to_stitch'] = "0,2000,1"
+        self.parameters['images_to_stitch'] = "0,2000,1"
         self.which_images_to_stitch_entry.setText("0,2000,1")
         self.dry_run_checkbox.setChecked(False)
         self.parameters['dry_run'] = False
@@ -202,9 +202,14 @@ class AutoVerticalStitchGUI(QWidget):
         self.darks_entry.setText(self.parameters['darks_dir'])
         self.sample_moved_down_checkbox.setChecked(bool(self.parameters['sample_moved_down']))
         self.overlap_region_entry.setText(self.parameters['overlap_region'])
+        if self.parameters['stitch_reconstructed_slices']:
+            self.reslice_checkbox.setEnabled(True)
+            self.recon_slices_input_entry.setEnabled(True)
+            self.recon_slices_input_button.setEnabled(True)
         self.stitch_reconstructed_slices_rButton.setChecked(bool(self.parameters['stitch_reconstructed_slices']))
         self.stitch_projections_rButton.setChecked(bool(self.parameters['stitch_projections']))
         self.reslice_checkbox.setChecked(bool(self.parameters['reslice']))
+        self.which_images_to_stitch_entry.setText(self.parameters['images_to_stitch'])
         self.equalize_intensity_rButton.setChecked(bool(self.parameters['equalize_intensity']))
         self.concatenate_rButton.setChecked(bool(self.parameters['concatenate']))
         self.dry_run_checkbox.setChecked(bool(self.parameters['dry_run']))
@@ -297,6 +302,9 @@ class AutoVerticalStitchGUI(QWidget):
         if self.stitch_reconstructed_slices_rButton.isChecked():
             self.recon_slices_input_button.setEnabled(True)
             self.recon_slices_input_entry.setEnabled(True)
+            self.reslice_checkbox.setEnabled(True)
+            self.reslice_checkbox.setChecked(True)
+            self.parameters['reslice'] = True
 
     def stitch_projections_rButton_clicked(self):
         logging.debug("Stitch Projections: " + str(self.stitch_projections_rButton.isChecked()))
@@ -305,6 +313,9 @@ class AutoVerticalStitchGUI(QWidget):
         if self.stitch_projections_rButton.isChecked():
             self.recon_slices_input_button.setDisabled(True)
             self.recon_slices_input_entry.setDisabled(True)
+            self.reslice_checkbox.setDisabled(True)
+            self.reslice_checkbox.setChecked(False)
+            self.parameters['reslice'] = False
 
     def equalize_intensity_rButton_clicked(self):
         logging.debug("Equalize Intensity: " + str(self.equalize_intensity_rButton.isChecked()))
@@ -327,7 +338,7 @@ class AutoVerticalStitchGUI(QWidget):
     def save_params_button_clicked(self):
         logging.debug("Save params button clicked")
         dir_explore = QFileDialog(self)
-        params_file_path = dir_explore.getSaveFileName(filter="*.yaml")
+        params_file_path = dir_explore.getSaveFileName(filter="*.yaml", directory="/")
         garbage, file_name = os.path.split(params_file_path[0])
         file_extension = os.path.splitext(file_name)
         # If the user doesn't enter the .yaml extension then append it to filepath
@@ -345,7 +356,7 @@ class AutoVerticalStitchGUI(QWidget):
     def import_params_button_clicked(self):
         logging.debug("Import params button clicked")
         dir_explore = QFileDialog(self)
-        params_file_path = dir_explore.getOpenFileName(filter="*.yaml")
+        params_file_path = dir_explore.getOpenFileName(filter="*.yaml", directory="/")
         try:
             file_in = open(params_file_path[0], 'r')
             new_parameters = yaml.load(file_in, Loader=yaml.FullLoader)
