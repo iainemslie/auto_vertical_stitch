@@ -48,7 +48,7 @@ class AutoVerticalStitchFunctions:
         #self.stitch_single_image()
         if self.parameters['equalize_intensity']:
             print("Stitching using intensity equalization")
-            #self.main_stitch_multiproc()
+            self.main_stitch_multiproc()
         elif self.parameters['concatenate']:
             print("Stitching using concatenation")
             self.main_concatenate_multiproc()
@@ -205,6 +205,37 @@ class AutoVerticalStitchFunctions:
 
         return self.compute_rotation_axis(first_cropped, second_cropped)
 
+    # Stitching Functions
+    def prepare(self, ct_dir):
+        start, stop, step = [int(value) for value in self.parameters['images_to_stitch'].split(',')]
+
+        if not os.path.exists(self.parameters['output_dir']):
+            os.makedirs(self.parameters['output_dir'])
+        vertical_steps = sorted([dI for dI in os.listdir(ct_dir) if os.path.isdir(os.path.join(ct_dir, dI))])
+        # determine input data type
+        tmp = os.path.join(ct_dir, vertical_steps[0], 'tomo', '*.tif')
+        tmp = sorted(glob.glob(tmp))[0]
+        input_data_type = type(self.read_image(tmp, flip_image=False)[0][0])
+
+        if self.parameters['reslice']:
+            print("Creating orthogonal sections")
+            for v_step in vertical_steps:
+                in_name = os.path.join(self.parameters['recon_slices_input_dir'], v_step, "sli")
+                out_name = os.path.join(self.parameters['temp_dir'], v_step, 'sli-%04i.tif')
+                cmd = 'tofu sinos --projections {} --output {}'.format(in_name, out_name)
+                cmd += " --y {} --height {} --y-step {}".format(start, stop - start, step)
+                cmd += " --output-bytes-per-file 0"
+                os.system(cmd)
+                time.sleep(10)
+            in_dir = self.parameters['temp_dir']
+        else:
+            if self.parameters['stitch_reconstructed_slices']:
+                in_dir = self.parameters['recon_slices_input_dir']
+            elif self.parameters['stitch_projections']:
+                in_dir = self.parameters['projections_input_dir']
+        return in_dir, start, stop, step, input_data_type
+
+    # Concatenation
     def main_concatenate_multiproc(self):
         # start = time.time()
         # TODO: FOR EACH CT_DIR DO THIS
@@ -237,35 +268,6 @@ class AutoVerticalStitchFunctions:
             pool.map(exec_func, j_index)
             # print "Images stitched in {:.01f} sec".format(time.time()-start)
             print("========== Done ==========")
-
-    def prepare(self, ct_dir):
-        start, stop, step = [int(value) for value in self.parameters['images_to_stitch'].split(',')]
-
-        if not os.path.exists(self.parameters['output_dir']):
-            os.makedirs(self.parameters['output_dir'])
-        vertical_steps = sorted([dI for dI in os.listdir(ct_dir) if os.path.isdir(os.path.join(ct_dir, dI))])
-        # determine input data type
-        tmp = os.path.join(ct_dir, vertical_steps[0], 'tomo', '*.tif')
-        tmp = sorted(glob.glob(tmp))[0]
-        input_data_type = type(self.read_image(tmp, flip_image=False)[0][0])
-
-        if self.parameters['reslice']:
-            print("Creating orthogonal sections")
-            for v_step in vertical_steps:
-                in_name = os.path.join(self.parameters['recon_slices_input_dir'], v_step, "sli")
-                out_name = os.path.join(self.parameters['temp_dir'], v_step, 'sli-%04i.tif')
-                cmd = 'tofu sinos --projections {} --output {}'.format(in_name, out_name)
-                cmd += " --y {} --height {} --y-step {}".format(start, stop - start, step)
-                cmd += " --output-bytes-per-file 0"
-                os.system(cmd)
-                time.sleep(10)
-            in_dir = self.parameters['temp_dir']
-        else:
-            if self.parameters['stitch_reconstructed_slices']:
-                in_dir = self.parameters['recon_slices_input_dir']
-            elif self.parameters['stitch_projections']:
-                in_dir = self.parameters['projections_input_dir']
-        return in_dir, start, stop, step, input_data_type
 
     def exec_concatenate_multiproc(self, start, step, example_image_path, num_z_dirs, z_fold, in_dir, ct_dir, j):
         index = start + j * step
@@ -315,6 +317,75 @@ class AutoVerticalStitchFunctions:
         first = self.read_image(tmp, flip_image=False)
         image_rows, image_columns = first[a:b, :].shape
         return np.empty((image_rows * l, image_columns), dtype=first.dtype), image_rows, first.dtype
+
+    # Interpolate and Equalize Intensity
+    def main_stitch_multiproc(self):
+        for ct_dir in self.ct_dirs:
+            indir, start, stop, step, indtype = self.prepare(ct_dir)
+            # Reprows is the value of stitch pixel
+            dx = int(self.ct_stitch_pixel_dict[ct_dir])
+            # second: stitch them
+            if self.parameters['stitch_reconstructed_slices']:
+                if self.parameters['reslice']:
+                    Vsteps = sorted(os.listdir(self.parameters['temp_dir']))
+                    tmp = glob.glob(os.path.join(indir, Vsteps[0], '*.tif'))[0]
+                elif not self.parameters['reslice']:
+                    Vsteps = sorted(os.listdir(self.parameters['recon_slices_input_dir']))
+                    tmp = glob.glob(os.path.join(indir, Vsteps[0], 'sli', '*.tif'))[0]
+            elif self.parameters['stitch_projections']:
+                Vsteps = sorted(os.listdir(self.parameters['projections_input_dir']))
+                tmp = glob.glob(os.path.join(indir, Vsteps[0], 'tomo', '*.tif'))[0]
+
+            first = self.read_image(tmp, flip_image=False)
+            N, M = first.shape
+            Nnew = N - dx
+            ramp = np.linspace(0, 1, dx)
+
+            j_index = range(int((stop - start) / step))
+            pool = mp.Pool(processes=mp.cpu_count())
+            exec_func = partial(self.exec_stitch_multiproc, start, step, N, Nnew, Vsteps, indir, dx, M, ramp, indtype)
+            print("Adjusting and stitching")
+            # start = time.time()
+            pool.map(exec_func, j_index)
+            print("========== Done ==========")
+
+    def exec_stitch_multiproc(self, start, step, N, Nnew, Vsteps, indir, dx, M, ramp, indtype, j):
+        index = start + j * step
+        large_image_buffer = np.empty((Nnew * len(Vsteps) + dx, M), dtype=np.float32)
+        for i, vstep in enumerate(Vsteps[:-1]):
+            if self.parameters['stitch_reconstructed_slices']:
+                if self.parameters['reslice']:
+                    tmp = os.path.join(self.parameters['temp_dir'], Vsteps[i], '*.tif')
+                    tmp1 = os.path.join(self.parameters['temp_dir'], Vsteps[i + 1], '*.tif')
+                elif not self.parameters['reslice']:
+                    tmp = os.path.join(self.parameters['temp_dir'], Vsteps[i], 'sli', '*.tif')
+                    tmp1 = os.path.join(self.parameters['temp_dir'], Vsteps[i + 1], 'sli', '*.tif')
+            elif self.parameters['stitch_projections']:
+                tmp = os.path.join(self.parameters['temp_dir'], Vsteps[i], 'tomo', '*.tif')
+                tmp1 = os.path.join(self.parameters['temp_dir'], Vsteps[i + 1], 'tomo', '*.tif')
+
+            if self.parameters['reslice']:
+                tmp = sorted(glob.glob(tmp))[j]
+                tmp1 = sorted(glob.glob(tmp1))[j]
+            else:
+                tmp = sorted(glob.glob(tmp))[index]
+                tmp1 = sorted(glob.glob(tmp1))[index]
+            first = self.read_image(tmp, flip_image=False)
+            second = self.read_image(tmp1, flip_image=False)
+            if self.parameters['sample_moved_down']:  # sample moved downwards
+                first, second = np.flipud(first), np.flipud(second)
+
+            k = np.mean(first[N - dx:, :]) / np.mean(second[:dx, :])
+            second = second * k
+
+            a, b, c = i * Nnew, (i + 1) * Nnew, (i + 2) * Nnew
+            large_image_buffer[a:b, :] = first[:N - dx, :]
+            large_image_buffer[b:b + dx, :] = np.transpose(
+                np.transpose(first[N - dx:, :]) * (1 - ramp) + np.transpose(second[:dx, :]) * ramp)
+            large_image_buffer[b + dx:c + dx, :] = second[dx:, :]
+
+        output_path = os.path.join(self.parameters['output_dir'], '-sti-{:>04}.tif'.format(index))
+        tifffile.imsave(output_path, large_image_buffer.astype(indtype))
 
     def stitch_single_image(self):
         """Used for testing purposes"""
