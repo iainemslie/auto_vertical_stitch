@@ -41,6 +41,7 @@ class AutoVerticalStitchFunctions:
         print("\nFound the following stitch pixel(s): ")
         print(self.ct_stitch_pixel_dict)
 
+        # TODO: Need to maintain input ct-directory structure when slicing or stitching
         if not self.parameters['dry_run']:
             print("\n--> Stitching Images")
             if self.parameters['equalize_intensity']:
