@@ -434,6 +434,7 @@ class AutoVerticalStitchFunctions:
             large_image_buffer[b + dx:c + dx, :] = second[dx:, :]
 
         output_path = os.path.join(self.parameters['output_dir'], '-sti-{:>04}.tif'.format(index))
+        # TODO: Make sure to preserve bitdepth
         tifffile.imsave(output_path, large_image_buffer.astype(input_dir_type))
 
     def stitch_single_image(self):
