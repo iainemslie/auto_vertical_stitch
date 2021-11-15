@@ -7,9 +7,8 @@ import math
 import time
 import multiprocessing as mp
 from functools import partial
-from skimage import exposure, morphology, feature, filters
-from skimage.filters.rank import median
-from skimage.morphology import disk
+from skimage import exposure, feature, filters
+
 
 class AutoVerticalStitchFunctions:
     def __init__(self, parameters):
@@ -43,13 +42,16 @@ class AutoVerticalStitchFunctions:
         print("\nFound the following stitch pixel(s): ")
         print(self.ct_stitch_pixel_dict)
 
-        print("\n--> Stitching Images")
-        if self.parameters['equalize_intensity']:
-            print("Stitching using intensity equalization")
-            self.main_stitch_multiproc()
-        elif self.parameters['concatenate']:
-            print("Stitching using concatenation")
-            self.main_concatenate_multiproc()
+        if not self.parameters['dry_run']:
+            print("\n--> Stitching Images")
+            if self.parameters['equalize_intensity']:
+                print("Stitching using intensity equalization")
+                self.main_stitch_multiproc()
+            elif self.parameters['concatenate']:
+                print("Stitching using concatenation")
+                self.main_concatenate_multiproc()
+        else:
+            print("--> Finished Dry Run")
 
     def find_z_dirs(self):
         """
@@ -70,7 +72,7 @@ class AutoVerticalStitchFunctions:
         """
         temp_ct_dirs = []
         for z_path in self.z_dirs:
-            ct_dir_path, zdir = os.path.split(z_path)
+            ct_dir_path, z_dir = os.path.split(z_path)
             temp_ct_dirs.append(ct_dir_path)
         self.ct_dirs = sorted(list(set(temp_ct_dirs)))
 
@@ -111,14 +113,12 @@ class AutoVerticalStitchFunctions:
             #print(stitch_pixel_list)
             most_common_value = max(set(stitch_pixel_list), key=stitch_pixel_list.count)
             self.ct_stitch_pixel_dict[ct_dir] = int(most_common_value)
-            #print("Stitch Pixel: " + str(int(most_common_value)))
 
     def find_stitch_pixel_multiproc(self, midpoint_image_list, one_after_midpoint_image_list, image_index):
         if image_index > 0:
             image_index = image_index - 1
         midpoint_first_image_path = midpoint_image_list[image_index]
         one_after_midpoint_first_image_path = one_after_midpoint_image_list[image_index]
-        #return self.col_round(self.compute_stitch_pixel(midpoint_first_image_path, one_after_midpoint_first_image_path))
         return self.compute_stitch_pixel(midpoint_first_image_path, one_after_midpoint_first_image_path)
 
     def compute_stitch_pixel(self, upper_image: str, lower_image: str):
@@ -235,15 +235,11 @@ class AutoVerticalStitchFunctions:
 
     # Concatenation
     def main_concatenate_multiproc(self):
-        # start = time.time()
-        # TODO: FOR EACH CT_DIR DO THIS
         for ct_dir in self.ct_dirs:
             print(ct_dir, end=' ')
             print(self.ct_stitch_pixel_dict[ct_dir])
             in_dir, start, stop, step, input_data_type = self.prepare(ct_dir)
             print("Finished preparation")
-            # if args.ort:
-            #    print "Orthogonal sections created in {:.01f} sec".format(time.time()-start)
             z_fold = sorted([dI for dI in os.listdir(ct_dir) if os.path.isdir(os.path.join(ct_dir, dI))])
             num_z_dirs = len(z_fold)
 
@@ -260,11 +256,10 @@ class AutoVerticalStitchFunctions:
 
             j_index = range(int((stop - start) / step))
             pool = mp.Pool(processes=mp.cpu_count())
-            exec_func = partial(self.exec_concatenate_multiproc, start, step, image_list[0], num_z_dirs, z_fold, in_dir, ct_dir)
+            exec_func = partial(self.exec_concatenate_multiproc, start, step, image_list[0],
+                                num_z_dirs, z_fold, in_dir, ct_dir)
             print("Concatenating")
-            # start = time.time()
             pool.map(exec_func, j_index)
-            # print "Images stitched in {:.01f} sec".format(time.time()-start)
             print("========== Done ==========")
 
     def exec_concatenate_multiproc(self, start, step, example_image_path, num_z_dirs, z_fold, in_dir, ct_dir, j):
@@ -289,13 +284,13 @@ class AutoVerticalStitchFunctions:
             if self.parameters['reslice']:
                 print(tmp)
                 print(j)
-                fname = sorted(glob.glob(tmp))[j]
-                print(fname)
+                file_name = sorted(glob.glob(tmp))[j]
+                print(file_name)
             else:
-                fname = sorted(glob.glob(tmp))[index]
-            frame = self.read_image(fname, flip_image=False)[r1:r2, :]
+                file_name = sorted(glob.glob(tmp))[index]
+            frame = self.read_image(file_name, flip_image=False)[r1:r2, :]
             print(frame)
-            if self.parameters['sample_moved_down']:  # sample moved downwards
+            if self.parameters['sample_moved_down']:
                 large_stitch_buffer[i * image_rows:image_rows * (i + 1), :] = np.flipud(frame)
             else:
                 large_stitch_buffer[i * image_rows:image_rows * (i + 1), :] = frame
@@ -343,7 +338,6 @@ class AutoVerticalStitchFunctions:
             exec_func = partial(self.exec_stitch_multiproc, start, step, num_rows, num_rows_new, vertical_steps,
                                 dx, num_columns, ramp, input_dir_type)
             print("Adjusting and stitching")
-            # start = time.time()
             pool.map(exec_func, j_index)
             print("========== Done ==========")
 
@@ -351,7 +345,7 @@ class AutoVerticalStitchFunctions:
                               dx, num_columns, ramp, input_dir_type, j):
         index = start + j * step
         large_image_buffer = np.empty((num_rows_new * len(vertical_steps) + dx, num_columns), dtype=np.float32)
-        for i, vstep in enumerate(vertical_steps[:-1]):
+        for i, v_step in enumerate(vertical_steps[:-1]):
             if self.parameters['stitch_reconstructed_slices']:
                 if self.parameters['reslice']:
                     tmp = os.path.join(self.parameters['temp_dir'], vertical_steps[i], '*.tif')
@@ -371,7 +365,7 @@ class AutoVerticalStitchFunctions:
                 tmp1 = sorted(glob.glob(tmp1))[index]
             first = self.read_image(tmp, flip_image=False)
             second = self.read_image(tmp1, flip_image=False)
-            if self.parameters['sample_moved_down']:  # sample moved downwards
+            if self.parameters['sample_moved_down']:
                 first, second = np.flipud(first), np.flipud(second)
 
             k = np.mean(first[num_rows - dx:, :]) / np.mean(second[:dx, :])
@@ -449,13 +443,11 @@ class AutoVerticalStitchFunctions:
     """****** BORROWED FUNCTIONS ******"""
     def get_filtered_filenames(self, path, exts=['.tif', '.edf']):
         result = []
-
         try:
             for ext in exts:
                 result += [os.path.join(path, f) for f in os.listdir(path) if f.endswith(ext)]
         except OSError:
             return []
-
         return sorted(result)
 
     def compute_rotation_axis(self, first_projection, last_projection):
@@ -479,6 +471,7 @@ class AutoVerticalStitchFunctions:
 
         return (width / 2.0 + center) / 2
 
+    '''
     def stitch(self, upper, lower, axis, crop):
         height, width = lower.shape
         if axis > height / 2:
@@ -504,6 +497,7 @@ class AutoVerticalStitchFunctions:
         result[height:, :] = upper[dy:, :]
 
         return result[slice(int(crop), int(2 * (height - axis) - crop), 1), :]
+    '''
 
     def read_image(self, file_name, flip_image):
         """
