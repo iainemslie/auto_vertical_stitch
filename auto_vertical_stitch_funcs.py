@@ -22,7 +22,6 @@ class AutoVerticalStitchFunctions:
         """
         Main function that calls all other functions
         """
-
         self.make_temp_dir()
 
         self.print_parameters()
@@ -115,6 +114,13 @@ class AutoVerticalStitchFunctions:
             self.ct_stitch_pixel_dict[ct_dir] = int(most_common_value)
 
     def find_stitch_pixel_multiproc(self, midpoint_image_list, one_after_midpoint_image_list, image_index):
+        """
+        Determines the point at which the two images overlap
+        :param midpoint_image_list: List of images in the middle vertical step directory (z-directory)
+        :param one_after_midpoint_image_list: List of images in vertical step directory one after the middle
+        :param image_index: Index of images to compare between the two vertical step directories
+        :return: The pixel row at which the two images overlap
+        """
         if image_index > 0:
             image_index = image_index - 1
         midpoint_first_image_path = midpoint_image_list[image_index]
@@ -205,6 +211,13 @@ class AutoVerticalStitchFunctions:
 
     # Stitching Functions
     def prepare(self, ct_dir):
+        """
+        Creates resliced orthogonal images in temp dirctory if 'reslice' radio button selected
+        :param ct_dir: path to ct_directory containing z-directories "vertical views"
+        :return: "indir" - input directory to be used at next stage for stitching,
+                 "start, stop, step" determine which images to stitch
+                 "input_data_type" type of images to stitch
+        """
         start, stop, step = [int(value) for value in self.parameters['images_to_stitch'].split(',')]
 
         if not os.path.exists(self.parameters['output_dir']):
@@ -235,6 +248,10 @@ class AutoVerticalStitchFunctions:
 
     # Concatenation
     def main_concatenate_multiproc(self):
+        """
+        Stitches images using concatenation, splits across multiple processes/cpu-cores
+        :return:
+        """
         for ct_dir in self.ct_dirs:
             print(ct_dir, end=' ')
             print(self.ct_stitch_pixel_dict[ct_dir])
@@ -263,6 +280,18 @@ class AutoVerticalStitchFunctions:
             print("========== Done ==========")
 
     def exec_concatenate_multiproc(self, start, step, example_image_path, num_z_dirs, z_fold, in_dir, ct_dir, j):
+        """
+        Stitches images using concatenation
+        :param start: starting image index
+        :param step: distance between images to be stitched
+        :param example_image_path: Image from input dir, used to determine dimensions
+        :param num_z_dirs: Number of vertical steps (z-directories) in the input ct directory
+        :param z_fold: List of paths to the z-directories in current ct directory
+        :param in_dir: Path to input images to be stitched
+        :param ct_dir: Path to the ct_directory
+        :param j: Index for multiprocessing
+        :return: None - writes stitched images to output directory
+        """
         index = start + j * step
         # r1 stitch pixel value
         r1 = self.ct_stitch_pixel_dict[ct_dir]
@@ -306,13 +335,25 @@ class AutoVerticalStitchFunctions:
         # TODO: Make sure to preserve bitdepth
         tifffile.imsave(output_path, large_stitch_buffer)
 
-    def make_buf(self, tmp, l, a, b):
+    def make_buf(self, tmp, num_z_dirs, a, b):
+        """
+        Creates a large buffer image to store the stitched images in memory before writing
+        :param tmp: Path to an example input image
+        :param num_z_dirs: Number of vertical steps (z-directories)
+        :param a: stitch pixel value
+        :param b: image height - stitch pixel value
+        :return: Empty array large enough to hold stitched images in RAM
+        """
         first = self.read_image(tmp, flip_image=False)
         image_rows, image_columns = first[a:b, :].shape
-        return np.empty((image_rows * l, image_columns), dtype=first.dtype), image_rows, first.dtype
+        return np.empty((image_rows * num_z_dirs, image_columns), dtype=first.dtype), image_rows, first.dtype
 
     # Interpolate and Equalize Intensity
     def main_stitch_multiproc(self):
+        """
+        Stitch images using interpolation and intensity equalization
+        :return: None
+        """
         for ct_dir in self.ct_dirs:
             input_dir, start, stop, step, input_dir_type = self.prepare(ct_dir)
             dx = int(self.ct_stitch_pixel_dict[ct_dir])
@@ -343,6 +384,20 @@ class AutoVerticalStitchFunctions:
 
     def exec_stitch_multiproc(self, start, step, num_rows, num_rows_new, vertical_steps,
                               dx, num_columns, ramp, input_dir_type, j):
+        """
+        Stitch images using interpolation and intensity equalization
+        :param start: Image index to start stitching
+        :param step: Value to skip for each image stitched
+        :param num_rows: Number of rows in the original image
+        :param num_rows_new: Number of rows in the new stitched image
+        :param vertical_steps: List of vertical steps (z-directories)
+        :param dx:
+        :param num_columns: Number of columns in the original image
+        :param ramp:
+        :param input_dir_type:
+        :param j:
+        :return: None - writes stitched image to output directory
+        """
         index = start + j * step
         large_image_buffer = np.empty((num_rows_new * len(vertical_steps) + dx, num_columns), dtype=np.float32)
         for i, v_step in enumerate(vertical_steps[:-1]):
