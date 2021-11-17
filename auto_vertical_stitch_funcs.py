@@ -262,12 +262,9 @@ class AutoVerticalStitchFunctions:
         tail_list = []
         while head != self.parameters['projections_input_dir']:
             head, tail = os.path.split(head)
-            #print(head, " ", tail)
             tail_list.append(tail)
-            #print(tail_list)
         if len(tail_list) > 1:
             tail_list.reverse()
-            #print(tail_list)
         str_buff = ''
         for dir_str in tail_list:
             str_buff += dir_str
@@ -306,7 +303,8 @@ class AutoVerticalStitchFunctions:
                                 num_rows_new, vertical_steps, dx, num_columns, ramp, input_dir_type, ct_path)
             print("Adjusting and stitching")
             pool.map(exec_func, j_index)
-            print(f"========== Finished Stitcing {ct_dir} ==========")
+            print(f"========== Finished Stitching {ct_dir} ==========")
+        print("========== Completed Stitching For All CT-Directories ==========")
 
     def exec_stitch_multiproc(self, stitch_input_dir_path, start, step, num_rows, num_rows_new, vertical_steps,
                               dx, num_columns, ramp, input_dir_type, ct_path, j):
@@ -399,7 +397,8 @@ class AutoVerticalStitchFunctions:
                                 num_z_dirs, z_fold, stitch_input_dir_path, ct_dir, ct_path)
             print("Concatenating")
             pool.map(exec_func, j_index)
-            print("========== Done ==========")
+            print(f"========== Finished Stitching {ct_dir} ==========")
+        print("========== Completed Stitching For All CT-Directories ==========")
 
     def exec_concatenate_multiproc(self, start, step, example_image_path, num_z_dirs, z_fold,
                                    stitch_input_dir_path, ct_dir, ct_path, j):
