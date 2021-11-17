@@ -223,6 +223,7 @@ class AutoVerticalStitchFunctions:
 
         if not os.path.exists(self.parameters['output_dir']):
             os.makedirs(self.parameters['output_dir'])
+        print("Preparing to stitch: " + str(ct_dir))
         vertical_steps = sorted([dI for dI in os.listdir(ct_dir) if os.path.isdir(os.path.join(ct_dir, dI))])
         # determine input data type
         tmp = os.path.join(ct_dir, vertical_steps[0], 'tomo', '*.tif')
@@ -257,13 +258,16 @@ class AutoVerticalStitchFunctions:
         :param ct_dir:
         :return: diff of two strings
         """
-        head = ''
+        head = ct_dir
         tail_list = []
         while head != self.parameters['projections_input_dir']:
-            head, tail = os.path.split(ct_dir)
+            head, tail = os.path.split(head)
+            #print(head, " ", tail)
             tail_list.append(tail)
+            #print(tail_list)
         if len(tail_list) > 1:
-            tail_list = tail_list.reverse()
+            tail_list.reverse()
+            #print(tail_list)
         str_buff = ''
         for dir_str in tail_list:
             str_buff += dir_str
@@ -302,7 +306,7 @@ class AutoVerticalStitchFunctions:
                                 num_rows_new, vertical_steps, dx, num_columns, ramp, input_dir_type, ct_path)
             print("Adjusting and stitching")
             pool.map(exec_func, j_index)
-            print("========== Done ==========")
+            print(f"========== Finished Stitcing {ct_dir} ==========")
 
     def exec_stitch_multiproc(self, stitch_input_dir_path, start, step, num_rows, num_rows_new, vertical_steps,
                               dx, num_columns, ramp, input_dir_type, ct_path, j):
