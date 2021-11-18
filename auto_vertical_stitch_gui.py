@@ -417,6 +417,7 @@ class AutoVerticalStitchGUI(QWidget):
 
     def stitch_button_pressed(self):
         logging.debug("Stitch Button Pressed")
+        # TODO: Verify parameters before stitching
         if self.parameters['temp_dir'] == "...enter temporary directory":
             print("Please enter a valid temporary directory")
             return
