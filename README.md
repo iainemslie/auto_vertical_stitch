@@ -14,7 +14,7 @@ Created by Iain Emslie in 2022 for Jarvis Stobbs at the Canadian Light Source
 $ python -m venv stitchenv
 $ source stitchenv/Scripts/activate
 $ pip install requirements.txt
-$ python auto_vertical_stitch.funcs.py
+$ python auto_vertical_stitch_funcs.py
 ```
 
 ## Help
