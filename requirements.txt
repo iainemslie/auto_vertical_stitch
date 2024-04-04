@@ -1,0 +1,13 @@
+imageio==2.34.0
+lazy_loader==0.3
+networkx==3.2.1
+numpy==1.26.4
+packaging==24.0
+pillow==10.3.0
+PyQt5==5.15.10
+PyQt5-Qt5==5.15.2
+PyQt5-sip==12.13.0
+PyYAML==6.0.1
+scikit-image==0.22.0
+scipy==1.13.0
+tifffile==2024.2.12
